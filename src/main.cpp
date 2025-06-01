@@ -101,6 +101,7 @@ int main() {
     }
 
     crow::SimpleApp app;
+    crow::mustache::set_global_base("../templates");
 
     // GET endpoint - retrieve all users
     CROW_ROUTE(app, "/users").methods(crow::HTTPMethod::Get)
@@ -144,10 +145,9 @@ int main() {
         });
 
     // Root endpoint
-    CROW_ROUTE(app, "/").methods(crow::HTTPMethod::Get) ([]() {
-            crow::json::wvalue response;
-            response["message"] = "REST API with PostgreSQL - Use /users endpoint";
-            return response;
+    CROW_ROUTE(app, "/")([]() {
+            auto page = crow::mustache::load_text("page.html");
+            return page;
         });
 
     cout << "Starting server on port 8080..." << endl;
