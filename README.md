@@ -26,8 +26,20 @@ chmod +x run.sh
 ./run.sh
 ```
 
+The server will start on port 8080.
+
+## Webpage
+
+Once the server is running, you can access the web interface at:
+
+- **http://localhost:8080** - User management webpage with forms to add users and view all users
+
 ## API Endpoints
 
-- **GET /** - API information
-- **GET /users** - Retrieve all users
-- **POST /users** - Create a new user
+The REST API endpoints are accessible at:
+
+- **GET /** - Serves the user management webpage
+- **GET /users** - Retrieve all users (JSON response)
+- **POST /users** - Create a new user (accepts JSON: `{"name": "string", "email": "string"}`)
+
+All API endpoints are available on **http://localhost:8080**
