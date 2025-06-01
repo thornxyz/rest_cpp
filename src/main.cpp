@@ -1,8 +1,9 @@
-#include "crow_all.h"
 #include <iostream>
-#include <stdexcept>
-#include <pqxx/pqxx>
 #include <optional>
+#include <pqxx/pqxx>
+#include <stdexcept>
+
+#include "crow_all.h"
 
 using namespace std;
 
@@ -13,17 +14,17 @@ crow::json::wvalue error2json(const string &errstring) {
 }
 
 class DatabaseManager {
-private:
+   private:
     string connection_string;
 
-public:
+   public:
     DatabaseManager() : connection_string("dbname=mydb user=postgres password=password hostaddr=127.0.0.1 port=5432") {}
 
     void initializeDatabase() {
         try {
             pqxx::connection c(connection_string);
             pqxx::work w(c);
-            
+
             // Create table if it doesn't exist
             w.exec(R"(
                 CREATE TABLE IF NOT EXISTS users (
@@ -33,11 +34,10 @@ public:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             )");
-            
+
             w.commit();
             cout << "Database initialized successfully" << endl;
-        }
-        catch (const exception &e) {
+        } catch (const exception &e) {
             cerr << "Database initialization error: " << e.what() << endl;
             throw;
         }
@@ -47,12 +47,12 @@ public:
         try {
             pqxx::connection c(connection_string);
             pqxx::nontransaction w(c);
-            
+
             pqxx::result r = w.exec("SELECT id, name, email, created_at FROM users ORDER BY id");
-            
+
             crow::json::wvalue users;
             users = crow::json::wvalue::list();
-            
+
             int i = 0;
             for (auto row : r) {
                 crow::json::wvalue user;
@@ -62,26 +62,24 @@ public:
                 user["created_at"] = row[3].as<string>();
                 users[i++] = move(user);
             }
-            
+
             return users;
-        }
-        catch (const exception &e) {
+        } catch (const exception &e) {
             cerr << "Database select error: " << e.what() << endl;
             throw;
         }
     }
 
-    bool insertUser(const string& name, const string& email) {
+    bool insertUser(const string &name, const string &email) {
         try {
             pqxx::connection c(connection_string);
             pqxx::work w(c);
-            
+
             w.exec_params("INSERT INTO users (name, email) VALUES ($1, $2)", name, email);
             w.commit();
-            
+
             return true;
-        }
-        catch (const exception &e) {
+        } catch (const exception &e) {
             cerr << "Database insert error: " << e.what() << endl;
             return false;
         }
@@ -90,12 +88,11 @@ public:
 
 int main() {
     DatabaseManager db;
-    
+
     // Initialize database on startup
     try {
         db.initializeDatabase();
-    }
-    catch (const exception &e) {
+    } catch (const exception &e) {
         cerr << "Failed to initialize database. Exiting." << endl;
         return 1;
     }
@@ -104,51 +101,48 @@ int main() {
     crow::mustache::set_global_base("../templates");
 
     // GET endpoint - retrieve all users
-    CROW_ROUTE(app, "/users").methods(crow::HTTPMethod::Get)
-        ([&db]() {
-            try {
-                crow::json::wvalue users = db.getAllUsers();
-                return users;
-            }
-            catch (const exception &e) {
-                return error2json("Internal server error");
-            }
-        });
+    CROW_ROUTE(app, "/users").methods("GET"_method)([&db]() {
+        try {
+            crow::json::wvalue users = db.getAllUsers();
+            return users;
+        } catch (const exception &e) {
+            return error2json("Internal server error");
+        }
+    });
 
     // POST endpoint - insert new user
-    CROW_ROUTE(app, "/users").methods(crow::HTTPMethod::Post) ([&db](const crow::request& req) {
-            try {
-                auto json_data = crow::json::load(req.body);
-                
-                if (!json_data) {
-                    return error2json("Invalid JSON");
-                }
-                
-                if (!json_data.has("name") || !json_data.has("email")) {
-                    return error2json("Missing required fields: name, email");
-                }
-                
-                string name = json_data["name"].s();
-                string email = json_data["email"].s();
-                
-                if (db.insertUser(name, email)) {
-                    crow::json::wvalue response;
-                    response["message"] = "User created successfully";
-                    return response;
-                } else {
-                    return error2json("Failed to create user");
-                }
+    CROW_ROUTE(app, "/users").methods("POST"_method)([&db](const crow::request &req) {
+        try {
+            auto json_data = crow::json::load(req.body);
+
+            if (!json_data) {
+                return error2json("Invalid JSON");
             }
-            catch (const exception &e) {
-                return error2json("Internal server error");
+
+            if (!json_data.has("name") || !json_data.has("email")) {
+                return error2json("Missing required fields: name, email");
             }
-        });
+
+            string name = json_data["name"].s();
+            string email = json_data["email"].s();
+
+            if (db.insertUser(name, email)) {
+                crow::json::wvalue response;
+                response["message"] = "User created successfully";
+                return response;
+            } else {
+                return error2json("Failed to create user");
+            }
+        } catch (const exception &e) {
+            return error2json("Internal server error");
+        }
+    });
 
     // Root endpoint
     CROW_ROUTE(app, "/")([]() {
-            auto page = crow::mustache::load_text("page.html");
-            return page;
-        });
+        auto page = crow::mustache::load_text("page.html");
+        return page;
+    });
 
     cout << "Starting server on port 8080..." << endl;
 
