@@ -84,6 +84,61 @@ class DatabaseManager {
             return false;
         }
     }
+
+    bool deleteUser(int id) {
+        try {
+            pqxx::connection c(connection_string);
+            pqxx::work w(c);
+
+            auto result = w.exec_params("DELETE FROM users WHERE id = $1", id);
+            w.commit();
+
+            return result.affected_rows() > 0;
+        } catch (const exception &e) {
+            cerr << "Database delete error: " << e.what() << endl;
+            return false;
+        }
+    }
+
+    bool updateUser(int id, const string &name, const string &email) {
+        try {
+            pqxx::connection c(connection_string);
+            pqxx::work w(c);
+
+            auto result = w.exec_params("UPDATE users SET name = $1, email = $2 WHERE id = $3", name, email, id);
+            w.commit();
+
+            return result.affected_rows() > 0;
+        } catch (const exception &e) {
+            cerr << "Database update error: " << e.what() << endl;
+            return false;
+        }
+    }
+
+    optional<crow::json::wvalue> getUserById(int id) {
+        try {
+            pqxx::connection c(connection_string);
+            pqxx::nontransaction w(c);
+
+            pqxx::result r = w.exec_params("SELECT id, name, email, created_at FROM users WHERE id = $1", id);
+
+            if (r.empty()) {
+                return nullopt;
+            }
+
+            crow::json::wvalue user;
+            auto row = r[0];
+            user["id"] = row[0].as<int>();
+            user["name"] = row[1].as<string>();
+            user["email"] = row[2].as<string>();
+            user["created_at"] = row[3].as<string>();
+
+            return user;
+        } catch (const exception &e) {
+            cerr << "Database select error: " << e.what() << endl;
+            throw;
+        }
+    }
 };
 
 int main() {
@@ -132,6 +187,62 @@ int main() {
                 return response;
             } else {
                 return error2json("Failed to create user");
+            }
+        } catch (const exception &e) {
+            return error2json("Internal server error");
+        }
+    });
+
+    // GET endpoint - retrieve user by ID
+    CROW_ROUTE(app, "/users/<int>").methods("GET"_method)([&db](int id) {
+        try {
+            auto user_opt = db.getUserById(id);
+            if (!user_opt.has_value()) {
+                return error2json("User not found");
+            }
+            return user_opt.value();
+        } catch (const exception &e) {
+            return error2json("Internal server error");
+        }
+    });
+
+    // PUT endpoint - update user
+    CROW_ROUTE(app, "/users/<int>").methods("PUT"_method)([&db](const crow::request &req, int id) {
+        try {
+            auto json_data = crow::json::load(req.body);
+
+            if (!json_data) {
+                return error2json("Invalid JSON");
+            }
+
+            if (!json_data.has("name") || !json_data.has("email")) {
+                return error2json("Missing required fields: name, email");
+            }
+
+            string name = json_data["name"].s();
+            string email = json_data["email"].s();
+
+            if (db.updateUser(id, name, email)) {
+                crow::json::wvalue response;
+                response["message"] = "User updated successfully";
+                return response;
+            } else {
+                return error2json("Failed to update user or user not found");
+            }
+        } catch (const exception &e) {
+            return error2json("Internal server error");
+        }
+    });
+
+    // DELETE endpoint - delete user
+    CROW_ROUTE(app, "/users/<int>").methods("DELETE"_method)([&db](int id) {
+        try {
+            if (db.deleteUser(id)) {
+                crow::json::wvalue response;
+                response["message"] = "User deleted successfully";
+                return response;
+            } else {
+                return error2json("Failed to delete user or user not found");
             }
         } catch (const exception &e) {
             return error2json("Internal server error");

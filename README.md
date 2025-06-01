@@ -1,6 +1,6 @@
 # C++ REST API with PostgreSQL
 
-A simple REST API built with C++ using the Crow framework and PostgreSQL database. This application provides endpoints for user management with CRUD operations.
+A simple REST API server built with C++ using the Crow web framework and PostgreSQL database. Demonstrates CRUD operations, featuring a web interface.
 
 ## Prerequisites
 
@@ -40,6 +40,9 @@ The REST API endpoints are accessible at:
 
 - **GET /** - Serves the user management webpage
 - **GET /users** - Retrieve all users (JSON response)
+- **GET /users/{id}** - Retrieve a specific user by ID (JSON response)
 - **POST /users** - Create a new user (accepts JSON: `{"name": "string", "email": "string"}`)
+- **PUT /users/{id}** - Update an existing user (accepts JSON: `{"name": "string", "email": "string"}`)
+- **DELETE /users/{id}** - Delete a user by ID
 
 All API endpoints are available on **http://localhost:8080**
